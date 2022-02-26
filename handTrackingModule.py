@@ -1,5 +1,4 @@
 import math
-
 import cv2
 import mediapipe as mp
 import time
@@ -20,14 +19,48 @@ class handDetector:
         self.hands = self.mpHands.Hands(self.mode, self.maxHands, 1, self.detectionConfidence, self.trackingConfidence)
         self.mpDraw = mp.solutions.drawing_utils
 
-    def detectHands(self, vid, draw=True):
+    def detectHands(self, vid, draw=True, flipType=True):
         vidRGB = cv2.cvtColor(vid, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(vidRGB)
+        bothHands = []
+        h, w, c = vid.shape
         if self.results.multi_hand_landmarks:
-            for handLms in self.results.multi_hand_landmarks:
+            for handType, handLms in zip(self.results.multi_handedness, self.results.multi_hand_landmarks):
+                myHand = {}
+                myLocationList = []
+                xList = []
+                yList = []
+                for iD, lm in enumerate(handLms.landmark):
+                    px, py, pz = int(lm.x * w), int(lm.y * h), int(lm.z * w)
+                    myLocationList.append([iD, px, py])
+                    xList.append(px)
+                    yList.append(py)
+                xMin, xMax = min(xList), max(xList)
+                yMin, yMax = min(yList), max(yList)
+                boxW, boxH = xMax - xMin, yMax - yMin
+                bbox = xMin, yMin, boxW, boxH
+                cx, cy = bbox[0] + (bbox[2] // 2), bbox[1] + (bbox[3] // 2)
+                myHand["LocationList"] = myLocationList
+
+                if flipType:
+                    if handType.classification[0].label == "Right":
+                        myHand["type"] = "Left"
+                    else:
+                        myHand["type"] = "Right"
+                else:
+                    myHand["type"] = handType.classification[0].label
+                bothHands.append(myHand)
+
                 if draw:
-                    self.mpDraw.draw_landmarks(vid, handLms, self.mpHands.HAND_CONNECTIONS)
-        return vid
+                    self.mpDraw.draw_landmarks(vid, handLms,
+                                               self.mpHands.HAND_CONNECTIONS)
+                    cv2.rectangle(vid, (bbox[0] - 20, bbox[1] - 20),
+                                  (bbox[0] + bbox[2] + 20, bbox[1] + bbox[3] + 20),
+                                  (255, 0, 255), 2)
+        if draw:
+            return bothHands, vid
+        else:
+            return bothHands
 
     def findLocations(self, vid, hand=0, draw=True):
         self.locationsList = []
@@ -53,27 +86,50 @@ class handDetector:
                               (0, 255, 0), 2)
         return self.locationsList, bbox
 
-    def fingersUp(self):
-        fingers = []
-        # Thumb
-        try:
-            if self.locationsList[self.tipIds[0]][1] > self.locationsList[self.tipIds[0] - 1][1]:
-                fingers.append(1)
-            else:
-                fingers.append(0)
-        except IndexError:
-            fingers.append(0)
-        # Fingers
-        for iD in range(1, 5):
-            try:
-                if self.locationsList[self.tipIds[iD]][2] < self.locationsList[self.tipIds[iD] - 2][2]:
+    def fingersUp(self, myHand):
+        myHandType = myHand["type"]
+        myLmList = myHand["LocationList"]
+        if self.results.multi_hand_landmarks:
+            fingers = []
+            # Thumb
+            if myHandType == "Right":
+                if myLmList[self.tipIds[0]][0] > myLmList[self.tipIds[0] - 1][0]:
                     fingers.append(1)
                 else:
                     fingers.append(0)
-            except IndexError:
-                fingers.append(0)
+            else:
+                if myLmList[self.tipIds[0]][0] < myLmList[self.tipIds[0] - 1][0]:
+                    fingers.append(1)
+                else:
+                    fingers.append(0)
 
+            # 4 Fingers
+            for iD in range(1, 5):
+                if myLmList[self.tipIds[iD]][1] < myLmList[self.tipIds[iD] - 2][1]:
+                    fingers.append(1)
+                else:
+                    fingers.append(0)
         return fingers
+        # fingers = []
+        # # Thumb
+        # try:
+        #     if self.locationsList[self.tipIds[0]][2] < self.locationsList[self.tipIds[0] - 1][2]:
+        #         fingers.append(1)
+        #     else:
+        #         fingers.append(0)
+        # except IndexError:
+        #     fingers.append(0)
+        # # Fingers
+        # for iD in range(1, 5):
+        #     try:
+        #         if self.locationsList[self.tipIds[iD]][2] < self.locationsList[self.tipIds[iD] - 2][2]:
+        #             fingers.append(1)
+        #         else:
+        #             fingers.append(0)
+        #     except IndexError:
+        #         fingers.append(0)
+        #
+        # return fingers
 
     def findDistance(self, p1, p2, img, draw=True, r=4, t=2):
         x1, y1 = self.locationsList[p1][1:]
@@ -99,7 +155,7 @@ def main():
     while capture.isOpened():
         success, vid = capture.read()
         detector.detectHands(vid)
-        locations = detector.findLocations(vid)
+        locations, _ = detector.findLocations(vid)
         if len(locations):
             print(locations[4])
         currTime = time.time()
