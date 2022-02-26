@@ -93,19 +93,19 @@ class handDetector:
             fingers = []
             # Thumb
             if myHandType == "Right":
-                if myLmList[self.tipIds[0]][0] > myLmList[self.tipIds[0] - 1][0]:
+                if myLmList[self.tipIds[0]][1] > myLmList[self.tipIds[0] - 1][1]:
                     fingers.append(1)
                 else:
                     fingers.append(0)
             else:
-                if myLmList[self.tipIds[0]][0] < myLmList[self.tipIds[0] - 1][0]:
+                if myLmList[self.tipIds[0]][1] < myLmList[self.tipIds[0] - 1][1]:
                     fingers.append(1)
                 else:
                     fingers.append(0)
 
             # 4 Fingers
             for iD in range(1, 5):
-                if myLmList[self.tipIds[iD]][1] < myLmList[self.tipIds[iD] - 2][1]:
+                if myLmList[self.tipIds[iD]][2] < myLmList[self.tipIds[iD] - 2][2]:
                     fingers.append(1)
                 else:
                     fingers.append(0)

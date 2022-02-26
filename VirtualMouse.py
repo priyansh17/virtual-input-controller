@@ -39,7 +39,7 @@ while capture.isOpened():
     global currY, currX, x3, y3, x1, y1
     success, vid = capture.read()
 
-    detector.detectHands(vid)
+    hands, _ = detector.detectHands(vid)
     locations, bbox = detector.findLocations(vid)
 
     if len(locations):
@@ -48,7 +48,7 @@ while capture.isOpened():
         cv2.rectangle(vid, (0, frameReducedH), (frameReducedW, heightCap - frameReducedH),
                       (255, 0, 255), 2)
 
-        fingers = detector.fingersUp()
+        fingers = detector.fingersUp(hands[0])
 
         if fingers[1] == 1 and (fingers[2] + fingers[3] + fingers[4]) == 0:
             moveMouse()
